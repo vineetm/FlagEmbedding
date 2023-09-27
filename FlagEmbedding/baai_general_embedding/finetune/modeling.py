@@ -40,6 +40,13 @@ class BiEncoderModel(nn.Module):
         self.num_pos_queries = num_pos_queries
         self.temperature = temperature
         self.loss_type = loss_type
+
+        if self.loss_type == 'cross_entropy':
+            self.compute_loss = self.compute_loss_cross_entropy
+        elif self.loss_type == 'cosine':
+            self.compute_loss = self.compute_loss_cosine
+        else:
+            raise ValueError(f'loss_type={self.loss_type} is not supported')
         if not normlized:
             self.temperature = 1.0
             logger.info("reset temperature = 1.0 due to using inner product to compute similarity")
@@ -91,7 +98,10 @@ class BiEncoderModel(nn.Module):
             scores = self.compute_similarity(q_reps, p_reps)
             scores = scores / self.temperature
             scores = scores.view(q_reps.size(0), -1)
-            loss = self.compute_loss(scores, p_reps, q_reps)
+            num_psg = p_reps.size(0)
+            bs = q_reps.size(0) // self.num_pos_queries
+            num_psg_per_query = num_psg // bs
+            loss = self.compute_loss(scores, num_psg_per_query, bs)
 
         else:
             scores = self.compute_similarity(q_reps, p_reps)
@@ -103,21 +113,47 @@ class BiEncoderModel(nn.Module):
             p_reps=p_reps,
         )
 
-    def compute_loss(self, scores, p_reps, q_reps):
-        bs = q_reps.size(0) // self.num_pos_queries
-        if self.loss_type == 'cross_entropy':
+    def orig_forward(self, query: Dict[str, Tensor] = None, passage: Dict[str, Tensor] = None, teacher_score: Tensor = None):
+        q_reps = self.encode(query)
+        p_reps = self.encode(passage)
+
+        if self.training:
+            if self.negatives_cross_device:
+                q_reps = self._dist_gather_tensor(q_reps)
+                p_reps = self._dist_gather_tensor(p_reps)
+
+            scores = self.compute_similarity(q_reps, p_reps)
+            scores = scores / self.temperature
+            scores = scores.view(q_reps.size(0), -1)
+
             target = torch.arange(scores.size(0), device=scores.device, dtype=torch.long)
-            target = target * (p_reps.size(0) // bs)
-            target = target.repeat_interleave(self.num_pos_queries, dim=-1)
-            return self.cross_entropy(scores, target)
-        
+            target = target * (p_reps.size(0) // q_reps.size(0))
+            loss = self.compute_loss(scores, target)
+
+        else:
+            scores = self.compute_similarity(q_reps, p_reps)
+            loss = None
+        return EncoderOutput(
+            loss=loss,
+            scores=scores,
+            q_reps=q_reps,
+            p_reps=p_reps,
+        )
+
+    def orig_compute_loss(self, scores, target):
+        return self.cross_entropy(scores, target)
+
+
+    def compute_loss_cross_entropy(self, scores, num_psg_per_query, bs):
+        target = torch.arange(scores.size(0), device=scores.device, dtype=torch.long)
+        target = target * num_psg_per_query
+        return self.cross_entropy(scores, target)
+
+    def compute_loss_cosine(self, scores, num_psg_per_query, bs):
         expected_scores = torch.ones_like(scores, device=scores.device, dtype=scores.dtype) * -1.0            
         
-        num_psg_per_query = p_reps.size(0) // bs
-
         for i in range(bs):
             expected_scores[i:i+self.num_pos_queries,i*num_psg_per_query] = 1.0
-
         return torch.mean((expected_scores-scores) * expected_scores)
 
     def _dist_gather_tensor(self, t: Optional[torch.Tensor]):

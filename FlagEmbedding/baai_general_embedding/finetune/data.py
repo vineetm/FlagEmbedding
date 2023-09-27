@@ -38,14 +38,33 @@ class TrainDatasetForEmbedding(Dataset):
     def __len__(self):
         return self.total_len
 
-    def __getitem__(self, item) -> Tuple[BatchEncoding, List[BatchEncoding]]:
+    def orig___getitem__(self, item) -> Tuple[BatchEncoding, List[BatchEncoding]]:
+        query = self.dataset[item]['query']
         if self.args.query_instruction_for_retrieval is not None:
-            query = [
-                self.args.query_instruction_for_retrieval + q
-                for q in query
-            ]
+            query = self.args.query_instruction_for_retrieval + query
+
+        passages = []
+        pos = random.choice(self.dataset[item]['pos'])
+        passages.append(pos)
+
+        if len(self.dataset[item]['neg']) < self.args.train_group_size - 1:
+            num = math.ceil((self.args.train_group_size - 1) / len(self.dataset[item]['neg']))
+            negs = random.sample(self.dataset[item]['neg'] * num, self.args.train_group_size - 1)
         else:
-            queries = self.dataset[item]['query']
+            negs = random.sample(self.dataset[item]['neg'], self.args.train_group_size - 1)
+        passages.extend(negs)
+
+        if self.args.passage_instruction_for_retrieval is not None:
+            passages = [self.args.passage_instruction_for_retrieval+p for p in passages]
+        return query, passages
+
+    def __getitem__(self, item) -> Tuple[BatchEncoding, List[BatchEncoding]]:
+        queries = self.dataset[item]['queries']
+        if self.args.query_instruction_for_retrieval is not None:
+            queries = [
+                self.args.query_instruction_for_retrieval + query
+                for query in queries
+            ]
 
         passages = []
         pos = random.choice(self.dataset[item]['pos'])
