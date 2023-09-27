@@ -61,7 +61,7 @@ class TrainDatasetForEmbedding(Dataset):
         return query, passages
 
     def __getitem__(self, item) -> Tuple[BatchEncoding, List[BatchEncoding]]:
-        queries = self.dataset[item]['queries']
+        queries = self.dataset[item]['query']
         if self.args.query_instruction_for_retrieval is not None:
             queries = [
                 self.args.query_instruction_for_retrieval + query
