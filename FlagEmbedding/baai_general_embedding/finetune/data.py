@@ -16,7 +16,8 @@ class TrainDatasetForEmbedding(Dataset):
     def __init__(
             self,
             args: DataArguments,
-            tokenizer: PreTrainedTokenizer
+            tokenizer: PreTrainedTokenizer,
+            num_pos_queries: int = 1
     ):
         if os.path.isdir(args.train_data):
             train_datasets = []
@@ -34,6 +35,7 @@ class TrainDatasetForEmbedding(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.total_len = len(self.dataset)
+        self.num_pos_queries = num_pos_queries
 
     def __len__(self):
         return self.total_len
@@ -70,11 +72,11 @@ class TrainDatasetForEmbedding(Dataset):
         pos = random.choice(self.dataset[item]['pos'])
         passages.append(pos)
 
-        if len(self.dataset[item]['neg']) < self.args.train_group_size - 1:
-            num = math.ceil((self.args.train_group_size - 1) / len(self.dataset[item]['neg']))
-            negs = random.sample(self.dataset[item]['neg'] * num, self.args.train_group_size - 1)
+        if len(self.dataset[item]['neg']) < self.args.train_group_size - self.num_pos_queries:
+            num = math.ceil((self.args.train_group_size - self.num_pos_queries) / len(self.dataset[item]['neg']))
+            negs = random.sample(self.dataset[item]['neg'] * num, self.args.train_group_size - self.num_pos_queries)
         else:
-            negs = random.sample(self.dataset[item]['neg'], self.args.train_group_size - 1)
+            negs = random.sample(self.dataset[item]['neg'], self.args.train_group_size - self.num_pos_queries)
         passages.extend(negs)
 
         if self.args.passage_instruction_for_retrieval is not None:
