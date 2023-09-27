@@ -28,6 +28,8 @@ class BiEncoderModel(nn.Module):
                  sentence_pooling_method: str = 'cls',
                  negatives_cross_device: bool = False,
                  temperature: float = 1.0,
+                 num_pos_queries: int = 1,
+                 loss_type: str = 'cross_entropy'
                  ):
         super().__init__()
         self.model = AutoModel.from_pretrained(model_name)
@@ -35,7 +37,9 @@ class BiEncoderModel(nn.Module):
 
         self.normlized = normlized
         self.sentence_pooling_method = sentence_pooling_method
+        self.num_pos_queries = num_pos_queries
         self.temperature = temperature
+        self.loss_type = loss_type
         if not normlized:
             self.temperature = 1.0
             logger.info("reset temperature = 1.0 due to using inner product to compute similarity")
@@ -87,10 +91,7 @@ class BiEncoderModel(nn.Module):
             scores = self.compute_similarity(q_reps, p_reps)
             scores = scores / self.temperature
             scores = scores.view(q_reps.size(0), -1)
-
-            target = torch.arange(scores.size(0), device=scores.device, dtype=torch.long)
-            target = target * (p_reps.size(0) // q_reps.size(0))
-            loss = self.compute_loss(scores, target)
+            loss = self.compute_loss(scores, p_reps, q_reps)
 
         else:
             scores = self.compute_similarity(q_reps, p_reps)
@@ -102,8 +103,22 @@ class BiEncoderModel(nn.Module):
             p_reps=p_reps,
         )
 
-    def compute_loss(self, scores, target):
-        return self.cross_entropy(scores, target)
+    def compute_loss(self, scores, p_reps, q_reps):
+        bs = q_reps.size(0) // self.num_pos_queries
+        if self.loss_type == 'cross_entropy':
+            target = torch.arange(scores.size(0), device=scores.device, dtype=torch.long)
+            target = target * (p_reps.size(0) // bs)
+            target = target.repeat_interleave(self.num_pos_queries, dim=-1)
+            return self.cross_entropy(scores, target)
+        
+        expected_scores = torch.ones_like(scores, device=scores.device, dtype=scores.dtype) * -1.0            
+        
+        num_psg_per_query = p_reps.size(0) // bs
+
+        for i in range(bs):
+            expected_scores[i:i+self.num_pos_queries,i*num_psg_per_query] = 1.0
+
+        return torch.mean((expected_scores-scores) * expected_scores)
 
     def _dist_gather_tensor(self, t: Optional[torch.Tensor]):
         if t is None:

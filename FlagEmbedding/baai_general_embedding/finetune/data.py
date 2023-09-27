@@ -39,9 +39,13 @@ class TrainDatasetForEmbedding(Dataset):
         return self.total_len
 
     def __getitem__(self, item) -> Tuple[BatchEncoding, List[BatchEncoding]]:
-        query = self.dataset[item]['query']
         if self.args.query_instruction_for_retrieval is not None:
-            query = self.args.query_instruction_for_retrieval + query
+            query = [
+                self.args.query_instruction_for_retrieval + q
+                for q in query
+            ]
+        else:
+            queries = self.dataset[item]['query']
 
         passages = []
         pos = random.choice(self.dataset[item]['pos'])
@@ -56,7 +60,7 @@ class TrainDatasetForEmbedding(Dataset):
 
         if self.args.passage_instruction_for_retrieval is not None:
             passages = [self.args.passage_instruction_for_retrieval+p for p in passages]
-        return query, passages
+        return queries, passages
 
 
 @dataclass
