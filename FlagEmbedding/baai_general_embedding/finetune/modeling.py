@@ -146,9 +146,9 @@ class BiEncoderModel(nn.Module):
 
 
     def compute_loss_cross_entropy(self, scores, num_psg_per_query, bs):
-        target = torch.arange(scores.size(0), device=scores.device, dtype=torch.long)
+        target = torch.arange(bs, device=scores.device, dtype=torch.long)
         target = target * num_psg_per_query
-        target = target.repeat_interleave(self.num_pos_queries, dim=-1, device=target.device)
+        target = target.repeat_interleave(self.num_pos_queries, dim=-1)
         return self.cross_entropy(scores, target)
 
     def compute_loss_cosine(self, scores, num_psg_per_query, bs):
