@@ -45,6 +45,7 @@ class BiEncoderModel(nn.Module):
             self.compute_loss = self.compute_loss_cross_entropy
         elif self.loss_type == 'cosine':
             self.compute_loss = self.compute_loss_cosine
+            self.temperature = 1.0
         else:
             raise ValueError(f'loss_type={self.loss_type} is not supported')
         if not normlized:
@@ -147,6 +148,7 @@ class BiEncoderModel(nn.Module):
     def compute_loss_cross_entropy(self, scores, num_psg_per_query, bs):
         target = torch.arange(scores.size(0), device=scores.device, dtype=torch.long)
         target = target * num_psg_per_query
+        target = target.repeat_interleave(self.num_pos_queries, dim=-1, device=target.device)
         return self.cross_entropy(scores, target)
 
     def compute_loss_cosine(self, scores, num_psg_per_query, bs):
@@ -154,7 +156,8 @@ class BiEncoderModel(nn.Module):
         
         for i in range(bs):
             expected_scores[i:i+self.num_pos_queries,i*num_psg_per_query] = 1.0
-        return torch.mean((expected_scores-scores) * expected_scores)
+        loss = (expected_scores - scores) * expected_scores
+        return torch.mean(loss.sum(dim=-1))
 
     def _dist_gather_tensor(self, t: Optional[torch.Tensor]):
         if t is None:
