@@ -82,7 +82,7 @@ def main():
                 logging.info(f"Freeze the parameters for {k}")
                 v.requires_grad = False
 
-    train_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer, num_pos_queries=data_args.num_pos_queries)
+    train_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer)
 
     trainer = BiTrainer(
         model=model,

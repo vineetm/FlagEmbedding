@@ -71,3 +71,6 @@ def main():
   for key in distn:
       buckets = bucket_distn(distn[key])
       logging.info(f'{key=}, {buckets=}')
+
+if __name__ == '__main__':
+  main()
