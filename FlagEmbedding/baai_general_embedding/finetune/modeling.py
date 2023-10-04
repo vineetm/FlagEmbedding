@@ -87,26 +87,26 @@ class BiEncoderModel(nn.Module):
             return torch.matmul(q_reps, p_reps.transpose(0, 1))
         return torch.matmul(q_reps, p_reps.transpose(-2, -1))
 
-    def forward(self, query: Dict[str, Tensor] = None, passage: Dict[str, Tensor] = None, teacher_score: Tensor = None):
+    def forward(self, query: Dict[str, Tensor] = None, passage: Dict[str, Tensor] = None, return_loss = None, teacher_score: Tensor = None):
         q_reps = self.encode(query)
         p_reps = self.encode(passage)
+       
+        if self.negatives_cross_device:
+            q_reps = self._dist_gather_tensor(q_reps)
+            p_reps = self._dist_gather_tensor(p_reps)
 
+        scores = self.compute_similarity(q_reps, p_reps)
+        scores = scores / self.temperature
+        scores = scores.view(q_reps.size(0), -1)
+        num_psg = p_reps.size(0)
+        bs = q_reps.size(0) // self.num_pos_queries
+        num_psg_per_query = num_psg // bs
+    
         if self.training:
-            if self.negatives_cross_device:
-                q_reps = self._dist_gather_tensor(q_reps)
-                p_reps = self._dist_gather_tensor(p_reps)
-
-            scores = self.compute_similarity(q_reps, p_reps)
-            scores = scores / self.temperature
-            scores = scores.view(q_reps.size(0), -1)
-            num_psg = p_reps.size(0)
-            bs = q_reps.size(0) // self.num_pos_queries
-            num_psg_per_query = num_psg // bs
             loss = self.compute_loss(scores, num_psg_per_query, bs)
-
         else:
-            scores = self.compute_similarity(q_reps, p_reps)
-            loss = None
+            with torch.no_grad():
+                loss = self.compute_loss(scores, num_psg_per_query, bs)
         return EncoderOutput(
             loss=loss,
             scores=scores,

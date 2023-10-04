@@ -83,11 +83,13 @@ def main():
                 v.requires_grad = False
 
     train_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer)
+    eval_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer, mode='eval')
 
     trainer = BiTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         data_collator=EmbedCollator(
             tokenizer,
             query_max_len=data_args.query_max_len,

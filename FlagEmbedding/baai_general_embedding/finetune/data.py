@@ -17,6 +17,7 @@ class TrainDatasetForEmbedding(Dataset):
             self,
             args: DataArguments,
             tokenizer: PreTrainedTokenizer,
+            mode: str = 'train'
     ):
         if os.path.isdir(args.train_data):
             train_datasets = []
@@ -29,7 +30,10 @@ class TrainDatasetForEmbedding(Dataset):
                 train_datasets.append(temp_dataset)
             self.dataset = datasets.concatenate_datasets(train_datasets)
         else:
-            self.dataset = datasets.load_dataset('json', data_files=args.train_data, split='train')
+            if mode == 'train':
+                self.dataset = datasets.load_dataset('json', data_files=args.train_data, split='train')
+            else:
+                self.dataset = datasets.load_dataset('json', data_files=args.eval_data, split='train')
 
         self.tokenizer = tokenizer
         self.args = args

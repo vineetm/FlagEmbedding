@@ -32,6 +32,10 @@ class DataArguments:
     train_data: str = field(
         default=None, metadata={"help": "Path to train data"}
     )
+
+    eval_data: str = field(
+        default=None, metadata={"help": "Path to train data"}
+    )
     train_group_size: int = field(default=8)
 
     query_max_len: int = field(

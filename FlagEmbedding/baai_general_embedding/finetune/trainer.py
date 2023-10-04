@@ -1,3 +1,6 @@
+from typing import Any, Dict, List, Optional, Tuple, Union
+import torch
+from torch import nn
 from sentence_transformers import SentenceTransformer, models
 from transformers.trainer import *
 
@@ -40,5 +43,8 @@ class BiTrainer(Trainer):
 
         outputs = model(**inputs)
         loss = outputs.loss
-
         return (loss, outputs) if return_outputs else loss
+
+    def prediction_step(self, model: nn.Module, inputs: Dict[str, torch.Tensor | Any], prediction_loss_only: bool, ignore_keys: List[str] | None = None) -> Tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
+        inputs['return_loss'] = True
+        return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
