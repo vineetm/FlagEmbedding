@@ -57,7 +57,7 @@ def main():
 
 
 
-  dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer, num_pos_queries=1)  
+  dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer)  
   for datum in tqdm(dataset):
     query, passages = datum
     
