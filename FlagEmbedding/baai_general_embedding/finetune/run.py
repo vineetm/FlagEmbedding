@@ -83,7 +83,11 @@ def main():
                 v.requires_grad = False
 
     train_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer)
-    eval_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer, mode='eval')
+
+    eval_dataset = None
+    if data_args.eval_data is not None:
+        eval_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer, mode='eval')
+    
 
     trainer = BiTrainer(
         model=model,
