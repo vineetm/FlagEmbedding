@@ -29,6 +29,10 @@ class ModelArguments:
 
 @dataclass
 class DataArguments:
+    train_data_config: str = field(
+        default=None, metadata={"help": "Path to train data config with wts"}
+    )
+
     train_data: str = field(
         default=None, metadata={"help": "Path to train data"}
     )
@@ -67,9 +71,9 @@ class DataArguments:
 
     num_pos_queries: int = field(default=1, metadata={"help": "the number of positive queries for each example"})
 
-    def __post_init__(self):
-        if not os.path.exists(self.train_data):
-            raise FileNotFoundError(f"cannot find file: {self.train_data}, please set a true path")
+    # def __post_init__(self):
+    #     if not os.path.exists(self.train_data):
+    #         raise FileNotFoundError(f"cannot find file: {self.train_data}, please set a true path")
 
 @dataclass
 class RetrieverTrainingArguments(TrainingArguments):

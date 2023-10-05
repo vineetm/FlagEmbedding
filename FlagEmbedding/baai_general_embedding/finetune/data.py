@@ -1,16 +1,18 @@
 import math
+import json
 import os.path
 import random
 from dataclasses import dataclass
 from typing import List, Tuple
 
 import datasets
+import logging
 from torch.utils.data import Dataset
 from transformers import DataCollatorWithPadding
 from transformers import PreTrainedTokenizer, BatchEncoding
 
 from .arguments import DataArguments
-
+logger = logging.getLogger(__name__)
 
 class TrainDatasetForEmbedding(Dataset):
     def __init__(
@@ -19,17 +21,36 @@ class TrainDatasetForEmbedding(Dataset):
             tokenizer: PreTrainedTokenizer,
             mode: str = 'train'
     ):
-        if os.path.isdir(args.train_data):
+        if mode == 'train' and os.path.exists(args.train_data_config):
+            logger.info(f'Loading train data from config {args.train_data_config}')
+
+            with open(args.train_data_config, 'r') as f:
+                config = json.load(f)
+            
             train_datasets = []
-            for file in os.listdir(args.train_data):
-                temp_dataset = datasets.load_dataset('json', data_files=os.path.join(args.train_data, file),
-                                                     split='train')
-                if len(temp_dataset) > args.max_example_num_per_dataset:
-                    temp_dataset = temp_dataset.select(
-                        random.sample(list(range(len(temp_dataset))), args.max_example_num_per_dataset))
-                train_datasets.append(temp_dataset)
-            self.dataset = datasets.concatenate_datasets(train_datasets)
+            probs = []
+            total_wt = 0.
+            for datum in config:
+                train_datasets.append(datasets.load_dataset('json', data_files=datum['path'], split='train'))
+                logger.info(f'Loaded {datum["name"]} {datum["path"]} with weight {datum["weight"]}')
+                probs.append(datum['weight'])
+                total_wt += datum['weight']
+            
+            probs = [p / total_wt for p in probs]
+            logger.info(f'Loaded {len(train_datasets)} datasets with weights {probs}')
+            self.dataset = datasets.interleave_datasets(train_datasets, probabilities=probs, seed=42)
         else:
+            # if os.path.isdir(args.train_data):
+            #     train_datasets = []
+            #     for file in os.listdir(args.train_data):
+            #         temp_dataset = datasets.load_dataset('json', data_files=os.path.join(args.train_data, file),
+            #                                             split='train')
+            #         if len(temp_dataset) > args.max_example_num_per_dataset:
+            #             temp_dataset = temp_dataset.select(
+            #                 random.sample(list(range(len(temp_dataset))), args.max_example_num_per_dataset))
+            #         train_datasets.append(temp_dataset)
+            #     self.dataset = datasets.concatenate_datasets(train_datasets)
+            # else:
             if mode == 'train':
                 self.dataset = datasets.load_dataset('json', data_files=args.train_data, split='train')
             else:
@@ -38,6 +59,7 @@ class TrainDatasetForEmbedding(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.total_len = len(self.dataset)
+        logger.info(f'Loaded {self.total_len} examples')
 
     def __len__(self):
         return self.total_len
