@@ -99,12 +99,14 @@ class BiEncoderModel(nn.Module):
         scores = scores / self.temperature
         scores = scores.view(q_reps.size(0), -1)
         num_psg = p_reps.size(0)
-        bs = q_reps.size(0) // self.num_pos_queries
-        num_psg_per_query = num_psg // bs
-    
+        
         if self.training:
+            bs = q_reps.size(0) // self.num_pos_queries
+            num_psg_per_query = num_psg // bs
             loss = self.compute_loss(scores, num_psg_per_query, bs)
         else:
+            bs = q_reps.size(0)
+            num_psg_per_query = num_psg // bs
             with torch.no_grad():
                 loss = self.compute_loss(scores, num_psg_per_query, bs)
         return EncoderOutput(
@@ -146,8 +148,6 @@ class BiEncoderModel(nn.Module):
 
 
     def compute_loss_cross_entropy(self, scores, num_psg_per_query, bs):
-        if not self.training:
-            bs *= self.num_pos_queries
         target = torch.arange(bs, device=scores.device, dtype=torch.long)
         target = target * num_psg_per_query
         if self.training:
