@@ -1,8 +1,10 @@
 import logging
 import os
+import torch
 from pathlib import Path
 
 from transformers import AutoConfig, AutoTokenizer
+# from transformers import TrainerCallback
 from transformers import (
     HfArgumentParser,
     set_seed,
@@ -16,6 +18,12 @@ from .trainer import BiTrainer
 
 logger = logging.getLogger(__name__)
 
+# class ProfCallback(TrainerCallback):
+#     def __init__(self, prof):
+#         self.prof = prof
+
+#     def on_step_end(self, args, state, control, **kwargs):
+#         self.prof.step()
 
 def main():
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
@@ -100,7 +108,17 @@ def main():
             passage_max_len=data_args.passage_max_len
         ),
         tokenizer=tokenizer
+        
     )
+
+    # with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU,
+    #                                     torch.profiler.ProfilerActivity.CUDA], 
+    #                         schedule=torch.profiler.schedule(skip_first=100, wait=1, warmup=1, active=2, repeat=20),
+    #                         on_trace_ready=torch.profiler.tensorboard_trace_handler(training_args.logging_dir),
+    #                         profile_memory=True,
+    #                         with_stack=True,
+    #                         record_shapes=True) as prof:
+    #     trainer.add_callback(ProfCallback(prof=prof))
 
     Path(training_args.output_dir).mkdir(parents=True, exist_ok=True)
 
